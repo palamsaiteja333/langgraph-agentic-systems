@@ -1,23 +1,34 @@
+import os
+import random
+from typing import Literal
+
+from dotenv import load_dotenv
 from typing_extensions import TypedDict
+from langgraph.graph import END, START, StateGraph
+
+
+load_dotenv()
+
+os.environ.setdefault("LANGSMITH_PROJECT", "langgraph-agentic-systems")
+if os.getenv("LANGSMITH_API_KEY"):
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+else:
+    os.environ["LANGSMITH_TRACING"] = "false"
 
 class State(TypedDict):
     graph_state: str
 
 def node_1(state):
     print("---Node 1---")
-    return {"graph_state": state['graph_state'] +" I am"}
+    return {"graph_state": state['graph_state'] +" yo"}
 
 def node_2(state):
     print("---Node 2---")
-    return {"graph_state": state['graph_state'] +" happy!"}
+    return {"graph_state": state['graph_state'] +" you!"}
 
 def node_3(state):
     print("---Node 3---")
-    return {"graph_state": state['graph_state'] +" sad!"}
-
-
-import random
-from typing import Literal
+    return {"graph_state": state['graph_state'] +" me!"}
 
 def decide_mood(state) -> Literal["node_2", "node_3"]:
     
@@ -32,9 +43,6 @@ def decide_mood(state) -> Literal["node_2", "node_3"]:
     
     # 50% of the time, we return Node 3
     return "node_3"
-
-from IPython.display import Image, display
-from langgraph.graph import StateGraph, START, END
 
 # Build graph
 builder = StateGraph(State)
@@ -51,8 +59,23 @@ builder.add_edge("node_3", END)
 # Add
 graph = builder.compile()
 
-# View
-display(Image(graph.get_graph().draw_mermaid_png()))
+
+def run_agent(input_text: str = "Hi, this is Lance.") -> dict:
+    """Run the LangGraph agent and send its trace to LangSmith."""
+    return graph.invoke(
+        {"graph_state": input_text},
+        config={
+            "tags": ["langgraph-agentic-systems"],
+            "metadata": {
+                "agent_id": os.getenv("LANGSMITH_AGENT_ID", "agent"),
+                "environment": os.getenv(
+                    "LANGSMITH_AGENT_ENVIRONMENT",
+                    "development",
+                ),
+            },
+        },
+    )
 
 
-graph.invoke({"graph_state" : "Hi, this is Lance."})
+if __name__ == "__main__":
+    print(run_agent())
